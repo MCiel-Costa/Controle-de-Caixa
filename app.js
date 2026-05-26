@@ -136,6 +136,13 @@ function loadState() {
         } catch (e) {
             console.error("Erro ao carregar dados do LocalStorage", e);
         }
+    } else {
+        // First load initialization: connect to the user's Firebase database by default
+        appState.cloudConfig = {
+            enabled: true,
+            dbUrl: "https://fluxo-de-caixa-b25d5-default-rtdb.firebaseio.com/",
+            dbKey: "caixa_principal"
+        };
     }
     return false;
 }
@@ -1055,10 +1062,31 @@ function updateCdiFieldsWithFetchedRate() {
     });
 }
 
-// --- 13. INITIALIZATION ON LOAD ---
+// --- 13. URL PARAMETERS HANDLER ---
+
+function handleUrlParameters() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const urlKey = urlParams.get('caixa') || urlParams.get('chave');
+    
+    if (urlKey) {
+        appState.cloudConfig = {
+            enabled: true,
+            dbUrl: "https://fluxo-de-caixa-b25d5-default-rtdb.firebaseio.com/",
+            dbKey: urlKey
+        };
+        saveState();
+        return true;
+    }
+    return false;
+}
+
+// --- 14. INITIALIZATION ON LOAD ---
 
 window.addEventListener('DOMContentLoaded', () => {
     const hasData = loadState();
+    
+    // Handle URL parameters to dynamically configure cloud sync
+    handleUrlParameters();
     
     // Fetch latest CDI rate to pre-fill fields automatically
     updateCdiFieldsWithFetchedRate();
@@ -1072,11 +1100,18 @@ window.addEventListener('DOMContentLoaded', () => {
             syncFromCloud();
         }
     } else {
-        // No data, trigger initial setup modal
-        openModal('setupModal');
-        
-        // Pre-fill initial setup date to today
-        document.getElementById('setup-start-date').value = formatDate(new Date());
+        // If cloud sync is active, try to fetch from the cloud BEFORE opening setup modal
+        if (appState.cloudConfig && appState.cloudConfig.enabled) {
+            syncFromCloud().then(synced => {
+                if (!synced) {
+                    openModal('setupModal');
+                    document.getElementById('setup-start-date').value = formatDate(new Date());
+                }
+            });
+        } else {
+            openModal('setupModal');
+            document.getElementById('setup-start-date').value = formatDate(new Date());
+        }
     }
     
     // Populate cloud settings inputs if they exist
