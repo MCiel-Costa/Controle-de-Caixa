@@ -210,14 +210,11 @@ function recalculateHistory() {
     
     let currentDate = new Date(startDate);
     
-    // Run day-by-day loop starting from day + 1
-    currentDate.setDate(currentDate.getDate() + 1);
-    
     while (currentDate <= endDate) {
         const dateStr = formatDate(currentDate);
         const isBiz = isBusinessDay(currentDate);
         
-        if (isBiz) {
+        if (isBiz && dateStr !== startStr) {
             businessDaysCount++;
         }
         
@@ -254,8 +251,8 @@ function recalculateHistory() {
             }
         });
         
-        // 2. Process daily CDI yield on business days
-        if (isBiz) {
+        // 2. Process daily CDI yield on business days (only from day 1 onwards, not on setup date)
+        if (isBiz && dateStr !== startStr) {
             // Apply yield only on positive balance
             if (runningBalance > 0) {
                 const dailyYield = runningBalance * dailyCdiRate;
@@ -538,9 +535,13 @@ function updateQuickSimulations() {
         return simBalance - balance;
     };
     
-    document.getElementById('quick-sim-1m').innerText = '+' + simulatePeriod(21).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-    document.getElementById('quick-sim-6m').innerText = '+' + simulatePeriod(126).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-    document.getElementById('quick-sim-1y').innerText = '+' + simulatePeriod(252).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    const sim1m = document.getElementById('quick-sim-1m');
+    const sim6m = document.getElementById('quick-sim-6m');
+    const sim1y = document.getElementById('quick-sim-1y');
+    
+    if (sim1m) sim1m.innerText = '+' + simulatePeriod(21).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    if (sim6m) sim6m.innerText = '+' + simulatePeriod(126).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    if (sim1y) sim1y.innerText = '+' + simulatePeriod(252).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
 function quickSimulate(days) {
@@ -840,6 +841,11 @@ function saveInitialSetup() {
 }
 
 function submitDeposit() {
+    if (!appState.initialSetup) {
+        showToast('Erro: Faça a configuração inicial primeiro.', 'error');
+        openModal('setupModal');
+        return;
+    }
     const amountVal = parseFloat(document.getElementById('deposit-amount').value);
     const dateVal = document.getElementById('deposit-date').value;
     const descVal = document.getElementById('deposit-description').value.trim() || 'Depósito';
@@ -872,6 +878,11 @@ function submitDeposit() {
 }
 
 function submitWithdraw() {
+    if (!appState.initialSetup) {
+        showToast('Erro: Faça a configuração inicial primeiro.', 'error');
+        openModal('setupModal');
+        return;
+    }
     const amountVal = parseFloat(document.getElementById('withdraw-amount').value);
     const dateVal = document.getElementById('withdraw-date').value;
     const descVal = document.getElementById('withdraw-description').value.trim() || 'Retirada';
@@ -967,8 +978,28 @@ function importData(event) {
     reader.readAsText(file);
 }
 
-function confirmResetAll() {
+async function confirmResetAll() {
     if (confirm('Tem certeza absoluta que deseja apagar TODOS os seus dados? Esta ação é irreversível.')) {
+        // Se a sincronização em nuvem estiver ativa, apaga os dados na nuvem também
+        if (appState.cloudConfig && appState.cloudConfig.enabled) {
+            const { dbUrl, dbKey } = appState.cloudConfig;
+            if (dbUrl && dbKey) {
+                let cleanUrl = dbUrl.trim();
+                if (cleanUrl.endsWith('/')) {
+                    cleanUrl = cleanUrl.slice(0, -1);
+                }
+                const endpoint = `${cleanUrl}/caixas/${dbKey}.json`;
+                try {
+                    await fetch(endpoint, {
+                        method: 'DELETE'
+                    });
+                } catch (e) {
+                    console.error("Erro ao apagar dados da nuvem:", e);
+                    showToast('Aviso: Falha ao apagar dados na nuvem. Verifique a conexão.', 'error');
+                }
+            }
+        }
+
         localStorage.removeItem('controle_caixa_state');
         localStorage.removeItem('girocdi_state');
         appState = { initialSetup: null, manualTransactions: [] };
@@ -1030,6 +1061,23 @@ document.getElementById('sim-include-monthly-deposit').addEventListener('change'
 // --- 12. CENTRAL BANK OF BRAZIL CDI API FETCH ---
 
 async function fetchLatestCDI() {
+    // Tenta primeiro via BrasilAPI (que possui CORS totalmente liberado e é ideal para frontend puro)
+    try {
+        const response = await fetch('https://brasilapi.com.br/api/taxas/v1');
+        if (response.ok) {
+            const data = await response.json();
+            if (Array.isArray(data)) {
+                const cdiItem = data.find(item => item.nome === 'CDI');
+                if (cdiItem && typeof cdiItem.valor === 'number') {
+                    return cdiItem.valor;
+                }
+            }
+        }
+    } catch (e) {
+        console.warn("Falha ao buscar taxa CDI via BrasilAPI, tentando Banco Central...", e);
+    }
+
+    // Fallback: API direta do Banco Central do Brasil (SGS)
     try {
         const response = await fetch('https://api.bcb.gov.br/dados/serie/bcdata.sgs.4389/dados/ultimos/1?formato=json');
         if (!response.ok) throw new Error('Erro ao obter taxa CDI da API do Banco Central');
@@ -1165,27 +1213,32 @@ async function syncFromCloud() {
         if (!res.ok) throw new Error('Erro na resposta do servidor');
         const data = await res.json();
         
-        if (data) {
-            if (data.initialSetup) {
-                appState.initialSetup = data.initialSetup;
-                appState.manualTransactions = data.manualTransactions || [];
-                
-                // Save locally cached state
-                localStorage.setItem('controle_caixa_state', JSON.stringify(appState));
-                
-                recalculateHistory();
-                updateDashboardUI();
-                
-                if (statusDiv) {
-                    statusDiv.innerHTML = `<span style="color: var(--accent-emerald);"><i class="fa-solid fa-circle-check"></i> Sincronizado em tempo real! (Atualizado: ${new Date().toLocaleTimeString('pt-BR')})</span>`;
-                }
-                return true;
+        if (data && data.initialSetup) {
+            appState.initialSetup = data.initialSetup;
+            appState.manualTransactions = data.manualTransactions || [];
+            
+            // Save locally cached state
+            localStorage.setItem('controle_caixa_state', JSON.stringify(appState));
+            
+            recalculateHistory();
+            updateDashboardUI();
+            
+            if (statusDiv) {
+                statusDiv.innerHTML = `<span style="color: var(--accent-emerald);"><i class="fa-solid fa-circle-check"></i> Sincronizado em tempo real! (Atualizado: ${new Date().toLocaleTimeString('pt-BR')})</span>`;
             }
-        } else {
-            // New database key, push current local state to cloud
-            if (statusDiv) statusDiv.innerHTML = `<span style="color: var(--text-secondary);"><i class="fa-solid fa-spinner fa-spin"></i> Inicializando caixa na nuvem...</span>`;
-            await syncToCloud();
             return true;
+        } else {
+            // No data on cloud or no initial setup on cloud
+            if (appState.initialSetup) {
+                if (statusDiv) statusDiv.innerHTML = `<span style="color: var(--text-secondary);"><i class="fa-solid fa-spinner fa-spin"></i> Inicializando caixa na nuvem...</span>`;
+                await syncToCloud();
+                return true;
+            } else {
+                if (statusDiv) {
+                    statusDiv.innerHTML = `<span style="color: var(--accent-rose);"><i class="fa-solid fa-triangle-exclamation"></i> Aguardando configuração inicial...</span>`;
+                }
+                return false;
+            }
         }
     } catch (e) {
         console.error("Erro ao sincronizar com a nuvem:", e);
