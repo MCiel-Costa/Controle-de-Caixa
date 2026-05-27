@@ -124,6 +124,7 @@ function loadState() {
             localStorage.removeItem('girocdi_state');
         }
     }
+    let loaded = false;
     if (data) {
         try {
             appState = JSON.parse(data);
@@ -132,19 +133,20 @@ function loadState() {
             if (appState.initialSetup && !appState.initialSetup.hasOwnProperty('cdiPercentage')) {
                 appState.initialSetup.cdiPercentage = 100;
             }
-            return true;
+            loaded = true;
         } catch (e) {
             console.error("Erro ao carregar dados do LocalStorage", e);
         }
-    } else {
-        // First load initialization: connect to the user's Firebase database by default
-        appState.cloudConfig = {
-            enabled: true,
-            dbUrl: "https://fluxo-de-caixa-b25d5-default-rtdb.firebaseio.com/",
-            dbKey: "caixa_principal"
-        };
     }
-    return false;
+    
+    // Forçar a configuração do Firebase por padrão
+    appState.cloudConfig = {
+        enabled: true,
+        dbUrl: "https://fluxo-de-caixa-b25d5-default-rtdb.firebaseio.com/",
+        dbKey: "caixa_principal"
+    };
+    
+    return loaded;
 }
 
 function saveState() {
@@ -426,10 +428,18 @@ function updateHistoricalChart() {
         balanceChart.destroy();
     }
     
+    // Theme options
+    const isLight = document.body.classList.contains('light-mode');
+    
     // Indigo neon theme gradient
     const gradient = ctx.createLinearGradient(0, 0, 0, 300);
-    gradient.addColorStop(0, 'rgba(99, 102, 241, 0.25)');
-    gradient.addColorStop(1, 'rgba(99, 102, 241, 0)');
+    if (isLight) {
+        gradient.addColorStop(0, 'rgba(79, 70, 229, 0.2)');
+        gradient.addColorStop(1, 'rgba(79, 70, 229, 0)');
+    } else {
+        gradient.addColorStop(0, 'rgba(99, 102, 241, 0.25)');
+        gradient.addColorStop(1, 'rgba(99, 102, 241, 0)');
+    }
     
     balanceChart = new Chart(ctx, {
         type: 'line',
@@ -438,13 +448,13 @@ function updateHistoricalChart() {
             datasets: [{
                 label: 'Saldo Disponível',
                 data: dataPoints,
-                borderColor: '#6366f1',
+                borderColor: isLight ? '#4f46e5' : '#6366f1',
                 borderWidth: 3,
                 backgroundColor: gradient,
                 fill: true,
                 tension: 0.3,
-                pointBackgroundColor: '#6366f1',
-                pointBorderColor: '#0a0e1a',
+                pointBackgroundColor: isLight ? '#4f46e5' : '#6366f1',
+                pointBorderColor: isLight ? '#ffffff' : '#0a0e1a',
                 pointBorderWidth: 2,
                 pointRadius: datesToPlot.length > 30 ? 0 : 4,
                 pointHoverRadius: 6,
@@ -456,10 +466,12 @@ function updateHistoricalChart() {
             plugins: {
                 legend: { display: false },
                 tooltip: {
-                    backgroundColor: '#111827',
+                    backgroundColor: isLight ? '#ffffff' : '#111827',
+                    titleColor: isLight ? '#0f172a' : '#f8fafc',
+                    bodyColor: isLight ? '#0f172a' : '#f8fafc',
                     titleFont: { family: 'Plus Jakarta Sans', size: 12 },
                     bodyFont: { family: 'Plus Jakarta Sans', size: 14, weight: 'bold' },
-                    borderColor: 'rgba(255, 255, 255, 0.08)',
+                    borderColor: isLight ? 'rgba(0, 0, 0, 0.1)' : 'rgba(255, 255, 255, 0.08)',
                     borderWidth: 1,
                     padding: 12,
                     callbacks: {
@@ -473,15 +485,15 @@ function updateHistoricalChart() {
                 x: {
                     grid: { display: false },
                     ticks: {
-                        color: '#94a3b8',
+                        color: isLight ? '#475569' : '#94a3b8',
                         font: { family: 'Plus Jakarta Sans', size: 10 },
                         maxTicksLimit: 8
                     }
                 },
                 y: {
-                    grid: { color: 'rgba(255, 255, 255, 0.04)' },
+                    grid: { color: isLight ? 'rgba(0, 0, 0, 0.05)' : 'rgba(255, 255, 255, 0.04)' },
                     ticks: {
-                        color: '#94a3b8',
+                        color: isLight ? '#475569' : '#94a3b8',
                         font: { family: 'Plus Jakarta Sans', size: 10 },
                         callback: function(value) {
                             return 'R$ ' + value.toLocaleString('pt-BR', { maximumFractionDigits: 0 });
@@ -643,9 +655,16 @@ function renderSimulationChart(labels, balanceData, depositsData) {
         simulationChart.destroy();
     }
     
+    const isLight = document.body.classList.contains('light-mode');
+    
     const gradBal = ctx.createLinearGradient(0, 0, 0, 300);
-    gradBal.addColorStop(0, 'rgba(16, 185, 129, 0.2)');
-    gradBal.addColorStop(1, 'rgba(16, 185, 129, 0)');
+    if (isLight) {
+        gradBal.addColorStop(0, 'rgba(5, 150, 105, 0.2)');
+        gradBal.addColorStop(1, 'rgba(5, 150, 105, 0)');
+    } else {
+        gradBal.addColorStop(0, 'rgba(16, 185, 129, 0.2)');
+        gradBal.addColorStop(1, 'rgba(16, 185, 129, 0)');
+    }
     
     simulationChart = new Chart(ctx, {
         type: 'line',
@@ -655,7 +674,7 @@ function renderSimulationChart(labels, balanceData, depositsData) {
                 {
                     label: 'Patrimônio Estimado',
                     data: balanceData,
-                    borderColor: '#10b981',
+                    borderColor: isLight ? '#059669' : '#10b981',
                     borderWidth: 2,
                     backgroundColor: gradBal,
                     fill: true,
@@ -680,12 +699,16 @@ function renderSimulationChart(labels, balanceData, depositsData) {
             plugins: {
                 legend: { 
                     display: true, 
-                    labels: { color: '#f8fafc', font: { family: 'Plus Jakarta Sans' } }
+                    labels: { color: isLight ? '#0f172a' : '#f8fafc', font: { family: 'Plus Jakarta Sans' } }
                 },
                 tooltip: {
-                    backgroundColor: '#111827',
+                    backgroundColor: isLight ? '#ffffff' : '#111827',
+                    titleColor: isLight ? '#0f172a' : '#f8fafc',
+                    bodyColor: isLight ? '#0f172a' : '#f8fafc',
                     titleFont: { family: 'Plus Jakarta Sans' },
                     bodyFont: { family: 'Plus Jakarta Sans' },
+                    borderColor: isLight ? 'rgba(0, 0, 0, 0.1)' : 'rgba(255, 255, 255, 0.08)',
+                    borderWidth: 1,
                     callbacks: {
                         label: function(context) {
                             return ` ${context.dataset.label}: R$ ` + context.parsed.y.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
@@ -696,12 +719,12 @@ function renderSimulationChart(labels, balanceData, depositsData) {
             scales: {
                 x: {
                     grid: { display: false },
-                    ticks: { color: '#94a3b8', font: { family: 'Plus Jakarta Sans', size: 9 }, maxTicksLimit: 8 }
+                    ticks: { color: isLight ? '#475569' : '#94a3b8', font: { family: 'Plus Jakarta Sans', size: 9 }, maxTicksLimit: 8 }
                 },
                 y: {
-                    grid: { color: 'rgba(255, 255, 255, 0.04)' },
+                    grid: { color: isLight ? 'rgba(0, 0, 0, 0.05)' : 'rgba(255, 255, 255, 0.04)' },
                     ticks: {
-                        color: '#94a3b8',
+                        color: isLight ? '#475569' : '#94a3b8',
                         font: { family: 'Plus Jakarta Sans', size: 9 },
                         callback: function(value) {
                             return 'R$ ' + value.toLocaleString('pt-BR', { maximumFractionDigits: 0 });
@@ -1083,6 +1106,17 @@ function handleUrlParameters() {
 // --- 14. INITIALIZATION ON LOAD ---
 
 window.addEventListener('DOMContentLoaded', () => {
+    // Verificar e aplicar preferência de tema antes de carregar dados
+    const savedTheme = localStorage.getItem('theme');
+    const isLight = savedTheme === 'light';
+    if (isLight) {
+        document.body.classList.add('light-mode');
+    }
+    const btn = document.getElementById('theme-toggle');
+    if (btn) {
+        btn.innerHTML = isLight ? '<i class="fa-solid fa-moon"></i>' : '<i class="fa-solid fa-sun"></i>';
+    }
+
     const hasData = loadState();
     
     // Handle URL parameters to dynamically configure cloud sync
@@ -1095,27 +1129,17 @@ window.addEventListener('DOMContentLoaded', () => {
         recalculateHistory();
         updateDashboardUI();
         
-        // If cloud sync is active, perform pull sync
-        if (appState.cloudConfig && appState.cloudConfig.enabled) {
-            syncFromCloud();
-        }
+        // Sincronização automática com a nuvem na inicialização
+        syncFromCloud();
     } else {
-        // If cloud sync is active, try to fetch from the cloud BEFORE opening setup modal
-        if (appState.cloudConfig && appState.cloudConfig.enabled) {
-            syncFromCloud().then(synced => {
-                if (!synced) {
-                    openModal('setupModal');
-                    document.getElementById('setup-start-date').value = formatDate(new Date());
-                }
-            });
-        } else {
-            openModal('setupModal');
-            document.getElementById('setup-start-date').value = formatDate(new Date());
-        }
+        // Tenta buscar da nuvem antes de exigir configuração inicial
+        syncFromCloud().then(synced => {
+            if (!synced) {
+                openModal('setupModal');
+                document.getElementById('setup-start-date').value = formatDate(new Date());
+            }
+        });
     }
-    
-    // Populate cloud settings inputs if they exist
-    populateCloudSyncInputs();
 });
 
 // --- 14. CLOUD SYNC LOGIC (FIREBASE REST) ---
@@ -1214,59 +1238,30 @@ async function syncToCloud() {
     }
 }
 
-function toggleCloudSync() {
-    const enabled = document.getElementById('cloud-sync-enable').checked;
-    const fields = document.getElementById('cloud-sync-fields');
-    if (enabled) {
-        fields.classList.remove('hidden');
-    } else {
-        fields.classList.add('hidden');
-        if (appState.cloudConfig) {
-            appState.cloudConfig.enabled = false;
-            saveState();
-            showToast('Sincronização em nuvem desativada.', 'success');
-        }
-    }
-}
+// Removidas funções obsoletas de configuração manual de nuvem.
 
-function populateCloudSyncInputs() {
-    const checkbox = document.getElementById('cloud-sync-enable');
-    const fields = document.getElementById('cloud-sync-fields');
-    const urlInput = document.getElementById('cloud-db-url');
-    const keyInput = document.getElementById('cloud-db-key');
-    const statusDiv = document.getElementById('cloud-sync-status');
+// Alternar Tema Claro / Escuro
+function toggleTheme() {
+    const body = document.body;
+    const btn = document.getElementById('theme-toggle');
+    body.classList.toggle('light-mode');
     
-    if (appState.cloudConfig) {
-        checkbox.checked = appState.cloudConfig.enabled;
-        if (appState.cloudConfig.enabled) {
-            fields.classList.remove('hidden');
-            if (statusDiv) statusDiv.innerHTML = `<span style="color: var(--accent-emerald);"><i class="fa-solid fa-cloud"></i> Sincronização em nuvem ativada.</span>`;
-        }
-        urlInput.value = appState.cloudConfig.dbUrl || '';
-        keyInput.value = appState.cloudConfig.dbKey || '';
-    }
-}
-
-async function connectAndSyncCloud() {
-    const url = document.getElementById('cloud-db-url').value.trim();
-    const key = document.getElementById('cloud-db-key').value.trim();
+    const isLight = body.classList.contains('light-mode');
+    localStorage.setItem('theme', isLight ? 'light' : 'dark');
     
-    if (!url || !key) {
-        showToast('Preencha a URL e a Chave de Acesso para conectar.', 'error');
-        return;
+    // Atualizar ícone do botão
+    if (btn) {
+        btn.innerHTML = isLight ? '<i class="fa-solid fa-moon"></i>' : '<i class="fa-solid fa-sun"></i>';
     }
     
-    appState.cloudConfig = {
-        enabled: true,
-        dbUrl: url,
-        dbKey: key
-    };
+    // Redesenhar gráficos com cores atualizadas
+    if (balanceChart) {
+        updateHistoricalChart();
+    }
     
-    // Save configuration locally
-    localStorage.setItem('controle_caixa_state', JSON.stringify(appState));
-    
-    const success = await syncFromCloud();
-    if (success) {
-        showToast('Conectado com sucesso e dados sincronizados!', 'success');
+    // Redesenhar gráfico de simulação se estiver ativo
+    const simTab = document.getElementById('tab-simulation');
+    if (simTab && simTab.classList.contains('active')) {
+        runDetailedSimulation();
     }
 }

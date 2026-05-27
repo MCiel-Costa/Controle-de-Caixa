@@ -21,11 +21,7 @@
         <!-- Sidebar / Navigation -->
         <aside class="sidebar">
             <div class="brand">
-                <div class="brand-icon">
-                    <i class="fa-solid fa-chart-line-up"></i>
-                    <i class="fa-solid fa-money-bill-trend-up"></i>
-                </div>
-                <h2>Controle de <span>Caixa</span></h2>
+                <img src="https://lh3.googleusercontent.com/d/17-RwcBxWi0uPcLibzxlaC_f7fIqe08Kv" alt="Logo" class="brand-logo">
             </div>
             
             <nav class="nav-menu">
@@ -63,10 +59,13 @@
             <!-- Header -->
             <header class="top-header">
                 <div class="header-title">
-                    <h1>Olá! Bem-vindo de volta</h1>
+                    <h1>Controle de Caixa</h1>
                     <p>Seu dinheiro rendendo 100% CDI diariamente.</p>
                 </div>
                 <div class="header-actions">
+                    <button class="btn-theme-toggle" id="theme-toggle" onclick="toggleTheme()" title="Alternar Tema">
+                        <i class="fa-solid fa-sun"></i>
+                    </button>
                     <div class="current-date-badge">
                         <i class="fa-regular fa-calendar"></i>
                         <span id="current-simulated-date">26 de Maio de 2026</span>
@@ -355,35 +354,16 @@
                 <!-- Nuvem Sync Panel -->
                 <div class="panel margin-top-20">
                     <h2>Sincronização em Nuvem (Firebase)</h2>
-                    <p>Compartilhe o controle do caixa com outras pessoas em tempo real. Os dados serão atualizados de forma automática em todos os aparelhos conectados.</p>
+                    <p>Os dados deste caixa são sincronizados automaticamente na nuvem em tempo real para que todos os usuários tenham acesso às mesmas informações compartilhadas.</p>
                     
                     <div class="cloud-sync-form margin-top-20">
-                        <div class="form-group checkbox-group">
-                            <input type="checkbox" id="cloud-sync-enable" onchange="toggleCloudSync()">
-                            <label for="cloud-sync-enable" style="font-size: 1rem; color: var(--text-primary); font-weight: 700;">Ativar Sincronização em Nuvem</label>
+                        <div class="sync-status-indicator" id="cloud-sync-status" style="margin-bottom: 15px; font-size: 0.95rem; font-weight: 600; min-height: 20px;">
+                            <!-- Status text -->
                         </div>
                         
-                        <div id="cloud-sync-fields" class="hidden">
-                            <div class="form-group">
-                                <label for="cloud-db-url">URL do Firebase Database</label>
-                                <input type="url" id="cloud-db-url" placeholder="Ex: https://meu-caixa-default-rtdb.firebaseio.com/">
-                                <span class="form-help">Insira a URL do banco de dados criado gratuitamente no console do Firebase.</span>
-                            </div>
-                            
-                            <div class="form-group">
-                                <label for="cloud-db-key">Chave de Acesso do Caixa</label>
-                                <input type="text" id="cloud-db-key" placeholder="Ex: caixa-loja-centro">
-                                <span class="form-help">Esta chave funciona como a senha do seu caixa. Use a mesma chave em todos os dispositivos para sincronizar.</span>
-                            </div>
-                            
-                            <div class="sync-status-indicator" id="cloud-sync-status" style="margin-bottom: 15px; font-size: 0.85rem; font-weight: 500; min-height: 20px;">
-                                <!-- Status text -->
-                            </div>
-                            
-                            <button class="btn btn-primary" onclick="connectAndSyncCloud()">
-                                <i class="fa-solid fa-cloud-arrow-down"></i> Conectar & Sincronizar
-                            </button>
-                        </div>
+                        <button class="btn btn-primary" onclick="syncFromCloud()">
+                            <i class="fa-solid fa-arrows-rotate"></i> Sincronizar Agora
+                        </button>
                     </div>
                 </div>
             </section>
